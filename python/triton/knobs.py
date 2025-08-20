@@ -202,6 +202,7 @@ class env_nvidia_tool(env_base[str, NvidiaTool]):
     def get(self) -> NvidiaTool:
         return self.transform(getenv(self.key))
 
+    # pyrefly: ignore  # bad-override pyright agrees
     def transform(self, path: str) -> NvidiaTool:
         # We still add default as fallback in case the pointed binary isn't
         # accessible.
@@ -327,6 +328,7 @@ class build_knobs(base_knobs):
 
     @property
     def backend_dirs(self) -> set[str]:
+        # pyrefly: ignore  # bad-return
         return {path for path in (self.cudacrt_path, self.cudart_path) if path is not None}
 
 
@@ -350,6 +352,7 @@ class cache_knobs(base_knobs):
     remote_manager_class: env_class[RemoteCacheBackend] = env_class("TRITON_REMOTE_CACHE_BACKEND", "RemoteCacheBackend")
 
     def get_triton_dir(self, dirname: str) -> str:
+        # pyrefly: ignore  # no-matching-overload
         return os.path.join(self.home_dir, ".triton", dirname)
 
 
