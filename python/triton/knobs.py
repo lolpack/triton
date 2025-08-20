@@ -6,17 +6,30 @@ import os
 import re
 import subprocess
 import sysconfig
+from contextlib import contextmanager
 
 from dataclasses import dataclass
-from contextlib import contextmanager
-from typing import cast, Any, Callable, Generator, Generic, Optional, Protocol, Type, TypeVar, TypedDict, TYPE_CHECKING, Union
+from typing import (
+    Any,
+    Callable,
+    cast,
+    Generator,
+    Generic,
+    Optional,
+    Protocol,
+    Type,
+    TYPE_CHECKING,
+    TypedDict,
+    TypeVar,
+    Union,
+)
 
 from triton._C.libtriton import getenv, getenv_bool  # type: ignore
 
 if TYPE_CHECKING:
+    from .compiler.compiler import ASTSource, IRSource, LazyDict
     from .runtime.cache import CacheManager, RemoteCacheBackend
     from .runtime.jit import JitFunctionInfo, KernelParam
-    from .compiler.compiler import ASTSource, LazyDict, IRSource
 
 
 class Env:
@@ -40,17 +53,17 @@ def setenv(key: str, value: Optional[str]) -> None:
 
 def toenv(val: Any) -> Union[None, tuple[Optional[str]]]:
     if val is None:
-        return (None, )
+        return (None,)
 
     t = type(val)
     if t is bool:
-        return ("1" if val else "0", )
+        return ("1" if val else "0",)
 
     if t is str:
-        return (val, )
+        return (val,)
 
     if t is int:
-        return (str(val), )
+        return (str(val),)
 
     return None
 
@@ -71,7 +84,9 @@ class env_base(Generic[SetType, GetType]):
     def __set_name__(self, objclass: Type[object], name: str) -> None:
         self.name = name
 
-    def __get__(self, obj: Optional[object], objclass: Optional[Type[object]]) -> GetType:
+    def __get__(
+        self, obj: Optional[object], objclass: Optional[Type[object]]
+    ) -> GetType:
         py_val = obj.__dict__.get(self.name, _NOTHING)
         if py_val is _NOTHING:
             return self.get()
@@ -149,7 +164,9 @@ class env_int(env_base[int, int]):
 ClassType = TypeVar("ClassType")
 
 
-class env_class(Generic[ClassType], env_base[Optional[Type[ClassType]], Optional[Type[ClassType]]]):
+class env_class(
+    Generic[ClassType], env_base[Optional[Type[ClassType]], Optional[Type[ClassType]]]
+):
 
     def __init__(self, key: str, type: str) -> None:
         super().__init__(key)
@@ -162,11 +179,15 @@ class env_class(Generic[ClassType], env_base[Optional[Type[ClassType]], Optional
             return None
         comps = val.split(":", 1)
         if len(comps) != 2:
-            raise RuntimeError(f"Unable to read {self.key}: '{val}' isn't of the form MODULE:CLASS")
+            raise RuntimeError(
+                f"Unable to read {self.key}: '{val}' isn't of the form MODULE:CLASS"
+            )
         cls = getattr(importlib.import_module(comps[0]), comps[1])
 
         if not any((c.__name__ == self.type for c in cls.mro())):
-            raise RuntimeError(f"Unable to use '{val}' from {self.key}: not of type '{self.type}'")
+            raise RuntimeError(
+                f"Unable to use '{val}' from {self.key}: not of type '{self.type}'"
+            )
 
         return cast(Type[ClassType], cls)
 
@@ -180,10 +201,14 @@ class NvidiaTool:
     @functools.lru_cache
     def from_path(path: str) -> Optional[NvidiaTool]:
         try:
-            result = subprocess.check_output([path, "--version"], stderr=subprocess.STDOUT)
+            result = subprocess.check_output(
+                [path, "--version"], stderr=subprocess.STDOUT
+            )
             if result is None:
                 return None
-            version = re.search(r".*release (\d+\.\d+).*", result.decode("utf-8"), flags=re.MULTILINE)
+            version = re.search(
+                r".*release (\d+\.\d+).*", result.decode("utf-8"), flags=re.MULTILINE
+            )
             if version is None:
                 return None
             return NvidiaTool(path, version.group(1))
@@ -196,13 +221,15 @@ class env_nvidia_tool(env_base[str, NvidiaTool]):
     def __init__(self, binary: str) -> None:
         binary += sysconfig.get_config_var("EXE")
         self.binary = binary
-        self.default_path = os.path.join(os.path.dirname(__file__), "backends", "nvidia", "bin", binary)
+        self.default_path = os.path.join(
+            os.path.dirname(__file__), "backends", "nvidia", "bin", binary
+        )
         super().__init__(f"TRITON_{binary.upper()}_PATH")
 
     def get(self) -> NvidiaTool:
         return self.transform(getenv(self.key))
 
-    # pyrefly: ignore  # bad-override pyright agrees
+    # pyrefly: dontignore  # bad-override pyright agrees
     def transform(self, path: str) -> NvidiaTool:
         # We still add default as fallback in case the pointed binary isn't
         # accessible.
@@ -260,12 +287,18 @@ class CompileTimes:
 
 class CompilationListener(Protocol):
 
-    def __call__(self, *, src: Union[ASTSource, IRSource], metadata: dict[str, Any], metadata_group: dict[str, str],
-                 times: CompileTimes, cache_hit: bool) -> None:
-        ...
+    def __call__(
+        self,
+        *,
+        src: Union[ASTSource, IRSource],
+        metadata: dict[str, Any],
+        metadata_group: dict[str, str],
+        times: CompileTimes,
+        cache_hit: bool,
+    ) -> None: ...
 
 
-knobs_type = TypeVar("knobs_type", bound='base_knobs')
+knobs_type = TypeVar("knobs_type", bound="base_knobs")
 
 
 class base_knobs:
@@ -296,7 +329,9 @@ class base_knobs:
     @contextmanager
     def scope(self) -> Generator[None, None, None]:
         try:
-            initial_env = {knob.key: getenv(knob.key) for knob in self.knob_descriptors.values()}
+            initial_env = {
+                knob.key: getenv(knob.key) for knob in self.knob_descriptors.values()
+            }
             orig = dict(self.__dict__)
             yield
         finally:
@@ -312,13 +347,21 @@ class base_knobs:
 
 class BuildImpl(Protocol):
 
-    def __call__(self, name: str, src: str, srcdir: str, library_dirs: list[str], include_dirs: list[str],
-                 libraries: list[str], /) -> str:
-        ...
+    def __call__(
+        self,
+        name: str,
+        src: str,
+        srcdir: str,
+        library_dirs: list[str],
+        include_dirs: list[str],
+        libraries: list[str],
+        /,
+    ) -> str: ...
 
 
 class build_knobs(base_knobs):
     """Configuration controlling how the native compiler is invoked"""
+
     cc: env_opt_str = env_opt_str("CC")
 
     cudacrt_path: env_opt_str = env_opt_str("TRITON_CUDACRT_PATH")
@@ -328,8 +371,10 @@ class build_knobs(base_knobs):
 
     @property
     def backend_dirs(self) -> set[str]:
-        # pyrefly: ignore  # bad-return
-        return {path for path in (self.cudacrt_path, self.cudart_path) if path is not None}
+        # pyrefly: dontignore  # bad-return
+        return {
+            path for path in (self.cudacrt_path, self.cudart_path) if path is not None
+        }
 
 
 class redis_knobs(base_knobs):
@@ -344,15 +389,25 @@ cache: cache_knobs
 class cache_knobs(base_knobs):
     home_dir: env_str = env_str("TRITON_HOME", os.path.expanduser("~/"))
 
-    dump_dir = env_str_callable_default("TRITON_DUMP_DIR", lambda: cache.get_triton_dir("dump"))
-    override_dir = env_str_callable_default("TRITON_OVERRIDE_DIR", lambda: cache.get_triton_dir("override"))
-    dir = env_str_callable_default("TRITON_CACHE_DIR", lambda: cache.get_triton_dir("cache"))
+    dump_dir = env_str_callable_default(
+        "TRITON_DUMP_DIR", lambda: cache.get_triton_dir("dump")
+    )
+    override_dir = env_str_callable_default(
+        "TRITON_OVERRIDE_DIR", lambda: cache.get_triton_dir("override")
+    )
+    dir = env_str_callable_default(
+        "TRITON_CACHE_DIR", lambda: cache.get_triton_dir("cache")
+    )
 
-    manager_class: env_class[CacheManager] = env_class("TRITON_CACHE_MANAGER", "CacheManager")
-    remote_manager_class: env_class[RemoteCacheBackend] = env_class("TRITON_REMOTE_CACHE_BACKEND", "RemoteCacheBackend")
+    manager_class: env_class[CacheManager] = env_class(
+        "TRITON_CACHE_MANAGER", "CacheManager"
+    )
+    remote_manager_class: env_class[RemoteCacheBackend] = env_class(
+        "TRITON_REMOTE_CACHE_BACKEND", "RemoteCacheBackend"
+    )
 
     def get_triton_dir(self, dirname: str) -> str:
-        # pyrefly: ignore  # no-matching-overload
+        # pyrefly: dontignore  # no-matching-overload
         return os.path.join(self.home_dir, ".triton", dirname)
 
 
@@ -366,7 +421,9 @@ class compilation_knobs(base_knobs):
     enable_asan: env_bool = env_bool("TRITON_ENABLE_ASAN")
     disable_line_info: env_bool = env_bool("TRITON_DISABLE_LINE_INFO")
     front_end_debugging: env_bool = env_bool("TRITON_FRONT_END_DEBUGGING")
-    allow_non_constexpr_globals: env_bool = env_bool("TRITON_ALLOW_NON_CONSTEXPR_GLOBALS")
+    allow_non_constexpr_globals: env_bool = env_bool(
+        "TRITON_ALLOW_NON_CONSTEXPR_GLOBALS"
+    )
     enable_experimental_consan: env_bool = env_bool("TRITON_ENABLE_EXPERIMENTAL_CONSAN")
     listener: Union[CompilationListener, None] = None
 
@@ -377,11 +434,9 @@ class autotuning_knobs(base_knobs):
 
 
 class LaunchHook(Protocol):
-    """Hook invoked before and after kernel launching
-    """
+    """Hook invoked before and after kernel launching"""
 
-    def __call__(self, metadata: LazyDict) -> None:
-        ...
+    def __call__(self, metadata: LazyDict) -> None: ...
 
 
 class InitHandleHook(Protocol):
@@ -396,16 +451,14 @@ class InitHandleHook(Protocol):
         name: str,
         metadata_group: dict[str, str],
         hash: str,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 F = TypeVar("F", bound=Callable)
 
 
 class HookChain(Generic[F]):
-    """A chain of hooks of the same type F to be called in order.
-    """
+    """A chain of hooks of the same type F to be called in order."""
 
     def __init__(self, reversed: bool = False):
         self.calls: list[F] = []
@@ -447,9 +500,16 @@ class JITHookCompileInfo(TypedDict):
 
 class JITHook(Protocol):
 
-    def __call__(self, *, key: str, repr: str, fn: JitFunctionInfo, compile: JITHookCompileInfo, is_manual_warmup: bool,
-                 already_compiled: bool) -> Optional[bool]:
-        ...
+    def __call__(
+        self,
+        *,
+        key: str,
+        repr: str,
+        fn: JitFunctionInfo,
+        compile: JITHookCompileInfo,
+        is_manual_warmup: bool,
+        already_compiled: bool,
+    ) -> Optional[bool]: ...
 
 
 class runtime_knobs(base_knobs):
@@ -497,7 +557,9 @@ class amd_knobs(base_knobs):
 
     # We use strs so that we can have a default value based on other runtime info
     use_block_pingpong: env_opt_bool = env_opt_bool("TRITON_HIP_USE_BLOCK_PINGPONG")
-    use_in_thread_transpose: env_opt_bool = env_opt_bool("TRITON_HIP_USE_IN_THREAD_TRANSPOSE")
+    use_in_thread_transpose: env_opt_bool = env_opt_bool(
+        "TRITON_HIP_USE_IN_THREAD_TRANSPOSE"
+    )
 
     global_prefetch: env_int = env_int("TRITON_HIP_GLOBAL_PREFETCH")
     local_prefetch: env_int = env_int("TRITON_HIP_LOCAL_PREFETCH")

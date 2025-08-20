@@ -48,9 +48,9 @@ project-excludes = ["**/build/"]
 
 
 [tool.pyrefly.errors]
-implicit-import = false
-implicitly-defined-attribute = false
-unbound-name = false
+# implicit-import = false
+# # implicitly-defined-attribute = false
+# # unbound-name = false
 
 [[tool.pyrefly.sub-config]]
 matches = "python/test/**"
