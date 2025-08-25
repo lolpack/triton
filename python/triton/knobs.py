@@ -343,15 +343,17 @@ cache: cache_knobs
 class cache_knobs(base_knobs):
     home_dir: env_str = env_str("TRITON_HOME", os.path.expanduser("~/"))
 
+    # pyrefly: ignore  # unbound-name cache
     dump_dir = env_str_callable_default("TRITON_DUMP_DIR", lambda: cache.get_triton_dir("dump"))
+    # pyrefly: ignore  # unbound-name cache
     override_dir = env_str_callable_default("TRITON_OVERRIDE_DIR", lambda: cache.get_triton_dir("override"))
+    # pyrefly: ignore  # unbound-name cache
     dir = env_str_callable_default("TRITON_CACHE_DIR", lambda: cache.get_triton_dir("cache"))
 
     manager_class: env_class[CacheManager] = env_class("TRITON_CACHE_MANAGER", "CacheManager")
     remote_manager_class: env_class[RemoteCacheBackend] = env_class("TRITON_REMOTE_CACHE_BACKEND", "RemoteCacheBackend")
 
     def get_triton_dir(self, dirname: str) -> str:
-        # pyrefly: ignore  # no-matching-overload
         return os.path.join(self.home_dir, ".triton", dirname)
 
 
