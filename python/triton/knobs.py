@@ -328,7 +328,6 @@ class build_knobs(base_knobs):
 
     @property
     def backend_dirs(self) -> set[str]:
-        # pyrefly: ignore  # bad-return
         return {path for path in (self.cudacrt_path, self.cudart_path) if path is not None}
 
 
